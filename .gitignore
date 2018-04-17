@@ -1,5 +1,6 @@
-objets/*
+objets/*.mod
+objets/*.o
 sources/.*.swp
-run/*
-graphes/*
-sorties/*
+run/truc
+graphes/*.eps
+sorties/*.dat
