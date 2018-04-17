@@ -110,8 +110,8 @@ PROGRAM main
     ! -------------------------------------------------------------------------------------------------------
     ! vérification du noyau SPH et des opérateurs régularisés sur la fonction f(x, y) = x
     ! -------------------------------------------------------------------------------------------------------
-    write (*, '(///,"np. |  f(x(i))  |  AR de x  |  GR de x (x1)   GR de x (x2)   |  GR_m de x                     |  &
-        &GR_p de x")')
+    write (*, '(///,"np. |  f(x(i))  |  AR de x  |  GR de x (x1)   GR de x (x2)   |  GR_m de x              &
+        &       |  GR_p de x")')
     write (*, '("-------------------------------------------------------------------------------------------&
         &----------------------------------")')
     do i = 1, np
@@ -120,7 +120,7 @@ PROGRAM main
         ! gradient régularisé
         call GR(i, x, w, R, x(:, 1), real2)
         ! formattage pour gnuplot
-        nvec(i, :) = (/ x(i, :), (real2 / fnorme2(real2)) * 0.5 * dx /)
+        nvec(i, :) = (/ x(i, :), (real2 / fnorme2(real2)) * 0.5_rp * dx /)
 
         call GR_m(i, x, w, R, x(:, 1), real2_2)
         call GR_p(i, x, w, R, x(:, 1), real2_3)
