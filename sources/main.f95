@@ -91,7 +91,7 @@ PROGRAM main
         ! gradient régularisé
         call GR(i, x, w, R, (/ (1.0_rp, k=1, np) /), real2)
         ! formattage pour gnuplot
-        nvec(i, :) = (/ x(i, :), (real2 / fnorme2(real2)) * 0.5 * dx /)
+        nvec(i, :) = (/ x(i, :), (real2 / fnorme2(real2)) * 0.5_rp * dx /)
 
         call GR_m(i, x, w, R, (/ (1.0_rp, k=1, np) /), real2_2)
         call GR_p(i, x, w, R, (/ (1.0_rp, k=1, np) /), real2_3)
@@ -107,6 +107,10 @@ PROGRAM main
         end if
     end do
 
+    call writeMat(nvec, "../sorties/nvec.dat")
+
+
+
     ! -------------------------------------------------------------------------------------------------------
     ! vérification du noyau SPH et des opérateurs régularisés sur la fonction f(x, y) = x
     ! -------------------------------------------------------------------------------------------------------
@@ -119,9 +123,6 @@ PROGRAM main
         call AR(i, x, w, R, x(:, 1), real1)
         ! gradient régularisé
         call GR(i, x, w, R, x(:, 1), real2)
-        ! formattage pour gnuplot
-        nvec(i, :) = (/ x(i, :), (real2 / fnorme2(real2)) * 0.5_rp * dx /)
-
         call GR_m(i, x, w, R, x(:, 1), real2_2)
         call GR_p(i, x, w, R, x(:, 1), real2_3)
 
@@ -135,8 +136,6 @@ PROGRAM main
                 i, x(i, 1), real1, real2, real2_2, real2_3
         end if
     end do
-
-    call writeMat(nvec, "../sorties/nvec.dat")
 
 
 
