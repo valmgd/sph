@@ -12,6 +12,7 @@ PROGRAM main
 
     implicit none
 
+    ! PARTIE 1 : MAILLAGE D'UN PAVÉ 2D
     ! variables pour "maillage" initial
     integer :: n
     real(rp) :: xmin, xmax, ymin, ymax
@@ -37,6 +38,8 @@ PROGRAM main
     ! vecteurs n de kappa = (1 / Rc) div(n)  (rayon de courbure) normal à la surface libre
     real(rp), dimension(:, :), allocatable :: nvec
 
+
+    ! PARTIE 2 : MAILLAGE D'UNE BULLE
     integer :: cpt
 
 
@@ -58,6 +61,7 @@ PROGRAM main
 
     ! création tableau de particules et pas d'espace
     call meshgrid(x1, x2, x)
+    call writeMat(x, "../sorties/x.dat")
     dx = x1(2) - x1(1)
     dy = x2(2) - x2(1)
 
@@ -72,7 +76,6 @@ PROGRAM main
     ! rayon noyau SPH
     R = 4.0_rp * dx
 
-    call writeMat(x, "../sorties/x.dat")
 
 
 
@@ -142,12 +145,11 @@ PROGRAM main
     ! -------------------------------------------------------------------------------------------------------
     ! maillage d'une bulle
     ! -------------------------------------------------------------------------------------------------------
-    cpt = 0
-    do i = 1, np
-        if (fnorme2(x(i, :) - (/ 0.5, 0.5 /)) < 0.5) then
-            !++!
-        end if
-    end do
+    deallocate(x)
+    x1 = linspace(1.0_rp, 2.0_rp, n)
+    x2 = linspace(2.0_rp, 3.0_rp, n)
+    call meshgridCircle(x1, x2, x)
+    call writeMat(x, "../sorties/x_circle.dat")
 
 
 

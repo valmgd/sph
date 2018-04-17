@@ -33,6 +33,37 @@ contains
         end do
     end subroutine
 
+    subroutine meshgridCircle(x1, x2, x)
+        ! paramètres
+        real(rp), dimension(:), intent(in) :: x1, x2
+        real(rp), dimension(:, :), allocatable, intent(out) :: x
+
+        ! variables locales
+        integer :: i, j, k
+        real(rp), dimension(size(x1) * size(x2), 2) :: xtemp
+        real(rp), dimension(2) :: centreBulle, temp
+        real(rp) :: rayonBulle
+
+        centreBulle = (/ (x1(size(x1)) - x1(1)) / 2.0_rp, (x2(size(x2)) - x2(1)) / 2.0_rp /)
+        rayonBulle = maxval(centreBulle)
+        centreBulle = centreBulle + (/ x1(1), x2(1) /)
+
+        k = 0
+
+        do i = 1, size(x1)
+            do j = 1, size(x2)
+                temp = (/ x1(i), x2(j) /)
+                if (fnorme2(temp - centreBulle) <= rayonBulle) then
+                    k = k + 1
+                    xtemp(k, :) = temp
+                end if
+            end do
+        end do
+
+        allocate(x(k, 2))
+        x = xtemp(1:k, :)
+    end subroutine
+
 
 
     ! -------------------------------------------------------------------------------------------------------
