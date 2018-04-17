@@ -14,6 +14,7 @@ PROGRAM main
 
     ! variables pour "maillage" initial
     integer :: n
+    real(rp) :: xmin, xmax, ymin, ymax
     real(rp), dimension(:), allocatable :: x1, x2
     real(rp) :: dx, dy
 
@@ -36,6 +37,8 @@ PROGRAM main
     ! vecteurs n de kappa = (1 / Rc) div(n)  (rayon de courbure) normal à la surface libre
     real(rp), dimension(:, :), allocatable :: nvec
 
+    integer :: cpt
+
 
 
     ! -------------------------------------------------------------------------------------------------------
@@ -43,11 +46,15 @@ PROGRAM main
     ! -------------------------------------------------------------------------------------------------------
     open(unit = 10, file = "../entrees/constantes")
     read(10, *) n
+    read(10, *) xmin
+    read(10, *) xmax
+    read(10, *) ymin
+    read(10, *) ymax
     close(10)
 
     ! subdivision des deux dimensions
-    x1 = linspace(0.0_rp, 1.0_rp, n)
-    x2 = linspace(0.0_rp, 1.0_rp, n)
+    x1 = linspace(xmin, xmax, n)
+    x2 = linspace(ymin, ymax, n)
 
     ! création tableau de particules et pas d'espace
     call meshgrid(x1, x2, x)
@@ -130,6 +137,18 @@ PROGRAM main
     end do
 
     call writeMat(nvec, "../sorties/nvec.dat")
+
+
+
+    ! -------------------------------------------------------------------------------------------------------
+    ! maillage d'une bulle
+    ! -------------------------------------------------------------------------------------------------------
+    cpt = 0
+    do i = 1, np
+        if (fnorme2(x(i, :) - (/ 0.5, 0.5 /)) < 0.5) then
+            !++!
+        end if
+    end do
 
 
 
