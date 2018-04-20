@@ -10,6 +10,9 @@ SOURCES = main.f95 sph.f95 donnees.f95 math.f95
 OBJ_DIR = ../objets
 RUN_DIR = ../run
 
+OBJECTS = $(wildcard $(OBJ_DIR)/*.o)
+MODULES = $(wildcard $(OBJ_DIR)/*.mod)
+
 FC      = gfortran
 FLAGS   = -fbounds-check -J $(OBJ_DIR)
 EXEC    = truc
@@ -41,7 +44,7 @@ $(OBJ_DIR)/main.o : main.f95 \
 $(OBJ_DIR)/math.o $(OBJ_DIR)/math.mod : math.f95
 	$(FC) $(FLAGS) -c math.f95 -o $(OBJ_DIR)/math.o
 
-$(OBJ_DIR)/donnees.o $(OBJ_DIR)/donnees.mod : donnees.f95
+$(OBJ_DIR)/donnees.o $(OBJ_DIR)/donnees.mod : donnees.f95 $(OBJ_DIR)/math.mod
 	$(FC) $(FLAGS) -c donnees.f95 -o $(OBJ_DIR)/donnees.o
 
 $(OBJ_DIR)/sph.o $(OBJ_DIR)/sph.mod : sph.f95 $(OBJ_DIR)/math.mod
@@ -75,7 +78,7 @@ open :
 # tout compiler et lancer gdb (segmentation fault)
 .PHONY : gdb
 gdb :
-	$(CC) -g $(SOURCES) -o $(EXEC) -lm && gdb ./$(EXEC)
+	$(FC) -g $(SOURCES) -o $(EXEC) && gdb ./$(EXEC)
 
 # clean et tarer le dossier
 .PHONY : tar

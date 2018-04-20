@@ -36,11 +36,20 @@ PROGRAM main
     integer :: i, k
 
     ! vecteurs n de kappa = (1 / Rc) div(n)  (rayon de courbure) normal à la surface libre
-    real(rp), dimension(:, :), allocatable :: nvec
+    real(rp), dimension(:, :), allocatable :: nvec, grad_P, plot_vec
 
 
     ! PARTIE 2 : MAILLAGE D'UNE BULLE
     integer :: cpt
+    real(rp) :: rayon
+    real(rp), dimension(2) :: centre
+    real(rp), dimension(100, 2) :: cc
+    real(rp), dimension(100) ::xx
+
+    ! VARIABLES ÉQUATION
+    real(rp), dimension(:), allocatable :: P
+    real(rp), dimension(:, :), allocatable :: sol, nor, fts, d_rwu_dt
+    real(rp), dimension(2) :: temp
 
 
 
@@ -146,15 +155,90 @@ PROGRAM main
     ! maillage d'une bulle
     ! -------------------------------------------------------------------------------------------------------
     deallocate(x)
-    x1 = linspace(1.0_rp, 2.0_rp, n)
-    x2 = linspace(2.0_rp, 3.0_rp, n)
-    call meshgridCircle(x1, x2, x)
+
+    ! données du disque à mailler
+    centre = (/ 1.0_rp, 1.0_rp /)
+    rayon = 1.0_rp
+
+
+    ! maillage du disque et actualisation des paramètre dépendant du maillage
+    call meshCircle(centre, rayon, n, x)
+    dx = x(2, 1) - x(1, 1)
+    R = 4.0_rp * dx
     call writeMat(x, "../sorties/x_circle.dat")
+    sh = shape(x)
+    np = sh(1)
+
+
+    ! volume des particules
+    deallocate(w, nvec)
+    allocate(w(np), nvec(np, 4))
+    !w = pi * rayon**2 / real(np, rp)
+    w = dx**2
+
+
+    ! vérification sur l'approx régularisée de la fonction 1 et de son gradient (0, 0)
+    i = nint(np / 2.0_rp)
+    call AR(i, x, w, R, (/ (1.0_rp, k=1, np) /), real1)
+    call GR(i, x, w, R, (/ (1.0_rp, k=1, np) /), real2)
+    print *, real1, real2
+
+
+    ! contour de la bulle que nous avons maillé pour graphique
+    xx = linspace(0.0_rp, 2.0_rp * pi, 100)
+    cc(:, 1) = centre(1) + rayon * cos(xx)
+    cc(:, 2) = centre(2) + rayon * sin(xx)
+    call writeMat(cc, "../sorties/cc.dat")
+
+
+    ! initialisation de la pression
+    allocate(P(np))
+    call init_pression(x, centre, rayon, P)
+    allocate(sol(np, 3))
+    sol(:, 1:2) = x
+    sol(:, 3) = P
+    call writeMat(sol, "../sorties/P.dat")
+
+
+    ! approximation du gradient de pression avec l'opérateur GR_p
+    allocate(grad_P(np, 4))
+    do i = 1, np
+        call GR_p(i, x, w, R, P, real2)
+        ! formattage pour gnuplot
+        grad_P(i, :) = (/ x(i, :), (real2 / fnorme2(real2)) * 0.5_rp * dx /)
+    end do
+    call writeMat(grad_P, "../sorties/grad_P.dat")
+
+
+    ! tension de surface
+    allocate(nor(np, 2))
+    allocate(fts(np, 2))
+    call normale(R, x, w, nor)
+    do i = 1, np
+        call F_TS(gamma_eau_air, i, x, w, nor, R, fts(i, :))
+        nvec(i, :) = (/ x(i, :), (fts(i, :) / fnorme2(fts(i, :))) * 0.5_rp * dx /)
+        !nvec(i, :) = (/ x(i, :), (nor(i, :) / fnorme2(nor(i, :))) * 0.5_rp * dx /)
+    end do
+    call writeMat(nvec, "../sorties/n_fts.dat")
+    print *, "x"
+    print *, fts(:, 1) - grad_P(:, 3)
+    print *, "y"
+    print *, fts(:, 2) - grad_P(:, 4)
+
+    allocate(d_rwu_dt(np, 2))
+    d_rwu_dt(:, 1) = w * grad_P(:, 3)
+    d_rwu_dt(:, 2) = w * grad_P(:, 4)
+
+    d_rwu_dt = d_rwu_dt + fts
 
 
 
     ! *******************************************************************************************************
     deallocate(x1, x2)
     deallocate(x, w)
+    deallocate(grad_P)
+    deallocate(fts)
+    deallocate(nor)
+    deallocate(d_rwu_dt)
 
 END PROGRAM main
