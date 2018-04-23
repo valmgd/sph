@@ -12,7 +12,7 @@ PROGRAM main
 
     implicit none
 
-    integer, parameter :: choice = 1
+    integer, parameter :: scenario = 1
 
     ! PARTIE 1 : MAILLAGE D'UN PAVÉ 2D
     ! variables pour "maillage" initial
@@ -50,180 +50,266 @@ PROGRAM main
 
     ! VARIABLES ÉQUATION
     real(rp), dimension(:), allocatable :: P
-    real(rp), dimension(:, :), allocatable :: sol, nor, fts, d_rwu_dt
+    real(rp), dimension(:, :), allocatable :: sol_P, nor, fts, d_rwu_dt
     real(rp), dimension(2) :: temp
 
 
 
-    ! -------------------------------------------------------------------------------------------------------
-    ! lecture et initialisation des variables
-    ! -------------------------------------------------------------------------------------------------------
     open(unit = 10, file = "../entrees/constantes")
     read(10, *) n
-    read(10, *) xmin
-    read(10, *) xmax
-    read(10, *) ymin
-    read(10, *) ymax
     close(10)
 
-    ! subdivision des deux dimensions
-    x1 = linspace(xmin, xmax, n)
-    x2 = linspace(ymin, ymax, n)
+    select case (scenario)
+    case (0)
+        print *, "CARRÉ"
+        ! ===================================================================================================
+        ! À partir d'un carré
+        ! ===================================================================================================
 
-    ! création tableau de particules et pas d'espace
-    call meshgrid(x1, x2, x)
-    call writeMat(x, "../sorties/x.dat")
-    dx = x1(2) - x1(1)
-    dy = x2(2) - x2(1)
+        ! ---------------------------------------------------------------------------------------------------
+        ! lecture et initialisation des variables
+        ! ---------------------------------------------------------------------------------------------------
+        open(unit = 10, file = "../entrees/constantes")
+        read(10, *)
+        read(10, *) xmin
+        read(10, *) xmax
+        read(10, *) ymin
+        read(10, *) ymax
+        close(10)
 
-    ! nombre de particules
-    sh = shape(x)
-    np = sh(1)
+        ! subdivision des deux dimensions
+        x1 = linspace(xmin, xmax, n)
+        x2 = linspace(ymin, ymax, n)
 
-    ! vecteur des volumes
-    allocate(w(np))
-    w = dx * dy
+        ! création tableau de particules et pas d'espace
+        call meshgrid(x1, x2, x)
+        call writeMat(x, "../sorties/x.dat")
+        dx = x1(2) - x1(1)
+        dy = x2(2) - x2(1)
 
-    ! rayon noyau SPH
-    R = 4.0_rp * dx
+        ! nombre de particules
+        sh = shape(x)
+        np = sh(1)
+
+        ! ---------------------------------------------------------------------------------------------------
+        ! allocations
+        ! ---------------------------------------------------------------------------------------------------
+        ! vecteur des volumes
+        allocate(w(np))
+        ! vérif noyau sph
+        allocate(nvec(np, 4))
+        ! pression
+        allocate(P(np))
+        ! particules + pression pour écriture fichier
+        allocate(sol_P(np, 3))
+        ! gradient de pression
+        allocate(grad_P(np, 2))
+        ! tableau de 4 col pour représentation vecteurs gnuplot
+        allocate(plot_vec(np, 4))
+        allocate(nor(np, 2))
+        ! force de tension de surface
+        allocate(fts(np, 2))
+        allocate(d_rwu_dt(np, 2))
+
+        w = dx * dy
+
+        ! rayon noyau SPH
+        R = 4.0_rp * dx
 
 
 
 
-    ! -------------------------------------------------------------------------------------------------------
-    ! vérification du noyau SPH et des opérateurs régularisés sur la fonction f = 1
-    ! -------------------------------------------------------------------------------------------------------
-    ! vérif noyau sph
-    allocate(nvec(np, 4))
-    write (*, '("np. |  AR de 1  |  GR de 1 (x1)   GR de 1 (x2)   |  GR_m de 1                     |  &
-        &GR_p de 1")')
-    write (*, '("-------------------------------------------------------------------------------------------&
-        &----------------------")')
-    do i = 1, np
-        ! approximation régularisée
+        ! pour un petit maillage, on affiche le résultat pour quelques points
+        if (n == 11) then
+            ! -----------------------------------------------------------------------------------------------
+            ! vérification du noyau SPH et des opérateurs régularisés sur la fonction f = 1
+            ! -----------------------------------------------------------------------------------------------
+            write (*, '("np. |  AR de 1  |  GR de 1 (x1)   GR de 1 (x2)   |  GR_m de 1                     |&
+                &  GR_p de 1")')
+            write (*, '("-----------------------------------------------------------------------------------&
+                ------------------------------")')
+            do i = 1, np
+                ! approximation régularisée
+                call AR(i, x, w, R, (/ (1.0_rp, k=1, np) /), real1)
+                ! gradient régularisé
+                call GR(i, x, w, R, (/ (1.0_rp, k=1, np) /), real2)
+                ! formattage pour gnuplot
+                nvec(i, :) = (/ x(i, :), (real2 / fnorme2(real2)) * 0.5_rp * dx /)
+
+                call GR_m(i, x, w, R, (/ (1.0_rp, k=1, np) /), real2_2)
+                call GR_p(i, x, w, R, (/ (1.0_rp, k=1, np) /), real2_3)
+
+                if (((37 <= i) .and. (i <= 41)) .or. &
+                    ((48 <= i) .and. (i <= 52)) .or. &
+                    ((59 <= i) .and. (i <= 63)) .or. &
+                    ((70 <= i) .and. (i <= 74)) .or. &
+                    ((81 <= i) .and. (i <= 85))) then
+                    !write (*, *) i, "|", real1, "|", real2
+                    write (*, '(1I2,"  |  ",1F7.5,"  |",2E15.5E3,"  |",2E15.5E3,"  |",2E15.5E3)') &
+                        i, real1, real2, real2_2, real2_3
+                end if
+            end do
+
+            call writeMat(nvec, "../sorties/nvec.dat")
+
+
+
+            ! -----------------------------------------------------------------------------------------------
+            ! vérification du noyau SPH et des opérateurs régularisés sur la fonction f(x, y) = x
+            ! -----------------------------------------------------------------------------------------------
+            write (*, '(///,"np. |  f(x(i))  |  AR de x  |  GR de x (x1)   GR de x (x2)   |  GR_m de x      &
+                &               |  GR_p de x")')
+            write (*, '("-----------------------------------------------------------------------------------&
+                ------------------------------------------")')
+            do i = 1, np
+                ! approximation régularisée
+                call AR(i, x, w, R, x(:, 1), real1)
+                ! gradient régularisé
+                call GR(i, x, w, R, x(:, 1), real2)
+                call GR_m(i, x, w, R, x(:, 1), real2_2)
+                call GR_p(i, x, w, R, x(:, 1), real2_3)
+
+                if (((37 <= i) .and. (i <= 41)) .or. &
+                    ((48 <= i) .and. (i <= 52)) .or. &
+                    ((59 <= i) .and. (i <= 63)) .or. &
+                    ((70 <= i) .and. (i <= 74)) .or. &
+                    ((81 <= i) .and. (i <= 85))) then
+                    !write (*, *) i, "|", real1, "|", real2
+                    write (*, '(1I2,"  |  ",1F7.5,"  |  ",1F7.5,"  |",2E15.5E3,"  |",2E15.5E3,"  |",2E15.5E3)') &
+                        i, x(i, 1), real1, real2, real2_2, real2_3
+                end if
+            end do
+        end if
+
+        ! contour de la bulle que nous avons maillé pour graphique
+        xx = linspace(0.0_rp, 4.0_rp, 100)
+        cc(1:25, 1) = xx(1:25) * (xmax - xmin) + xmin
+        cc(1:25, 2) = ymin - 0.5_rp * dy
+
+        cc(26:50, 1) = xmax + 0.5_rp * dx
+        cc(26:50, 2) = xx(1:25) * (ymax - ymin) + ymin
+
+        cc(51:75, 1) = xx(25:1:-1) * (xmax - xmin) + xmin
+        cc(51:75, 2) = ymax + 0.5_rp * dy
+
+        cc(76:100, 1) = xmin - 0.5_rp * dx
+        cc(76:100, 2) = xx(25:1:-1) * (ymax - ymin) + ymin
+
+        call writeMat(cc, "../sorties/cc.dat")
+
+
+        ! ---------------------------------------------------------------------------------------------------
+        ! initialisation inconnues équation
+        ! ---------------------------------------------------------------------------------------------------
+        ! initialisation de la pression
+        P = 0.0_rp
+        sol_P(:, 1:2) = x
+        sol_P(:, 3) = P
+        call writeMat(sol_P, "../sorties/P.dat")
+
+
+        ! approximation du gradient de pression avec l'opérateur GR_p
+        do i = 1, np
+            call GR_p(i, x, w, R, P, grad_P(i, :))
+            ! formattage pour gnuplot
+            plot_vec(i, :) = (/ x(i, :), (grad_P(i, :) / fnorme2(grad_P(i, :))) * 0.5_rp * dx /)
+        end do
+        call writeMat(plot_vec, "../sorties/grad_P.dat")
+
+
+
+    case (1)
+        print *, "BULLE"
+        ! ===================================================================================================
+        ! À partir d'une bulle
+        ! ===================================================================================================
+
+        ! ---------------------------------------------------------------------------------------------------
+        ! maillage de la bulle
+        ! ---------------------------------------------------------------------------------------------------
+        ! données du disque à mailler
+        centre = (/ 1.0_rp, 1.0_rp /)
+        rayon = 1.0_rp
+
+
+        ! maillage du disque et actualisation des paramètre dépendant du maillage
+        call meshCircle(centre, rayon, n, x)
+        dx = x(2, 1) - x(1, 1)
+        R = 4.0_rp * dx
+        call writeMat(x, "../sorties/x_circle.dat")
+        sh = shape(x)
+        np = sh(1)
+
+
+        ! ---------------------------------------------------------------------------------------------------
+        ! allocations
+        ! ---------------------------------------------------------------------------------------------------
+        ! volume des particules
+        allocate(w(np))
+        ! vérif noyau sph
+        allocate(nvec(np, 4))
+        ! pression
+        allocate(P(np))
+        ! particules + pression pour écriture fichier
+        allocate(sol_P(np, 3))
+        ! gradient de pression
+        allocate(grad_P(np, 2))
+        ! tableau de 4 col pour représentation vecteurs gnuplot
+        allocate(plot_vec(np, 4))
+        allocate(nor(np, 2))
+        ! force de tension de surface
+        allocate(fts(np, 2))
+        allocate(d_rwu_dt(np, 2))
+
+        !w = pi * rayon**2 / real(np, rp)
+        w = dx**2
+
+
+        ! vérification sur l'approx régularisée de la fonction 1 et de son gradient (0, 0)
+        i = nint(np / 2.0_rp)
         call AR(i, x, w, R, (/ (1.0_rp, k=1, np) /), real1)
-        ! gradient régularisé
         call GR(i, x, w, R, (/ (1.0_rp, k=1, np) /), real2)
-        ! formattage pour gnuplot
-        nvec(i, :) = (/ x(i, :), (real2 / fnorme2(real2)) * 0.5_rp * dx /)
-
-        call GR_m(i, x, w, R, (/ (1.0_rp, k=1, np) /), real2_2)
-        call GR_p(i, x, w, R, (/ (1.0_rp, k=1, np) /), real2_3)
-
-        if (((37 <= i) .and. (i <= 41)) .or. &
-            ((48 <= i) .and. (i <= 52)) .or. &
-            ((59 <= i) .and. (i <= 63)) .or. &
-            ((70 <= i) .and. (i <= 74)) .or. &
-            ((81 <= i) .and. (i <= 85))) then
-            !write (*, *) i, "|", real1, "|", real2
-            write (*, '(1I2,"  |  ",1F7.5,"  |",2E15.5E3,"  |",2E15.5E3,"  |",2E15.5E3)') &
-                i, real1, real2, real2_2, real2_3
-        end if
-    end do
-
-    call writeMat(nvec, "../sorties/nvec.dat")
+        print *, "vérif AR :", real1
+        print *, "vérif GR :", real2
 
 
+        ! contour de la bulle que nous avons maillé pour graphique
+        xx = linspace(0.0_rp, 2.0_rp * pi, 100)
+        cc(:, 1) = centre(1) + rayon * cos(xx)
+        cc(:, 2) = centre(2) + rayon * sin(xx)
+        call writeMat(cc, "../sorties/cc.dat")
 
-    ! -------------------------------------------------------------------------------------------------------
-    ! vérification du noyau SPH et des opérateurs régularisés sur la fonction f(x, y) = x
-    ! -------------------------------------------------------------------------------------------------------
-    write (*, '(///,"np. |  f(x(i))  |  AR de x  |  GR de x (x1)   GR de x (x2)   |  GR_m de x              &
-        &       |  GR_p de x")')
-    write (*, '("-------------------------------------------------------------------------------------------&
-        &----------------------------------")')
-    do i = 1, np
-        ! approximation régularisée
-        call AR(i, x, w, R, x(:, 1), real1)
-        ! gradient régularisé
-        call GR(i, x, w, R, x(:, 1), real2)
-        call GR_m(i, x, w, R, x(:, 1), real2_2)
-        call GR_p(i, x, w, R, x(:, 1), real2_3)
 
-        if (((37 <= i) .and. (i <= 41)) .or. &
-            ((48 <= i) .and. (i <= 52)) .or. &
-            ((59 <= i) .and. (i <= 63)) .or. &
-            ((70 <= i) .and. (i <= 74)) .or. &
-            ((81 <= i) .and. (i <= 85))) then
-            !write (*, *) i, "|", real1, "|", real2
-            write (*, '(1I2,"  |  ",1F7.5,"  |  ",1F7.5,"  |",2E15.5E3,"  |",2E15.5E3,"  |",2E15.5E3)') &
-                i, x(i, 1), real1, real2, real2_2, real2_3
-        end if
-    end do
+        ! ---------------------------------------------------------------------------------------------------
+        ! initialisation inconnues équation
+        ! ---------------------------------------------------------------------------------------------------
+        ! initialisation de la pression
+        call init_pression(x, centre, rayon, P)
+        sol_P(:, 1:2) = x
+        sol_P(:, 3) = P
+        call writeMat(sol_P, "../sorties/P.dat")
+
+
+        ! approximation du gradient de pression avec l'opérateur GR_p
+        do i = 1, np
+            call GR_p(i, x, w, R, P, grad_P(i, :))
+            ! formattage pour gnuplot
+            plot_vec(i, :) = (/ x(i, :), (grad_P(i, :) / fnorme2(grad_P(i, :))) * 0.5_rp * dx /)
+        end do
+        call writeMat(plot_vec, "../sorties/grad_P.dat")
+
+
+    case default
+        write (*, *) "Mauvais choix de scénario."
+    end select
 
 
 
-    ! =======================================================================================================
-    ! À partir d'une bulle
-    ! =======================================================================================================
-
-    ! -------------------------------------------------------------------------------------------------------
-    ! maillage de la bulle
-    ! -------------------------------------------------------------------------------------------------------
-    deallocate(x)
-
-    ! données du disque à mailler
-    centre = (/ 1.0_rp, 1.0_rp /)
-    rayon = 1.0_rp
 
 
-    ! maillage du disque et actualisation des paramètre dépendant du maillage
-    call meshCircle(centre, rayon, n, x)
-    dx = x(2, 1) - x(1, 1)
-    R = 4.0_rp * dx
-    call writeMat(x, "../sorties/x_circle.dat")
-    sh = shape(x)
-    np = sh(1)
-
-
-    ! volume des particules
-    deallocate(w, nvec)
-    allocate(w(np), nvec(np, 4))
-    !w = pi * rayon**2 / real(np, rp)
-    w = dx**2
-
-
-    ! vérification sur l'approx régularisée de la fonction 1 et de son gradient (0, 0)
-    i = nint(np / 2.0_rp)
-    call AR(i, x, w, R, (/ (1.0_rp, k=1, np) /), real1)
-    call GR(i, x, w, R, (/ (1.0_rp, k=1, np) /), real2)
-    print *, real1, real2
-
-
-    ! contour de la bulle que nous avons maillé pour graphique
-    xx = linspace(0.0_rp, 2.0_rp * pi, 100)
-    cc(:, 1) = centre(1) + rayon * cos(xx)
-    cc(:, 2) = centre(2) + rayon * sin(xx)
-    call writeMat(cc, "../sorties/cc.dat")
-
-
-    ! -------------------------------------------------------------------------------------------------------
-    ! initialisation inconnues équation
-    ! -------------------------------------------------------------------------------------------------------
-    ! initialisation de la pression
-    allocate(P(np))
-    call init_pression(x, centre, rayon, P)
-    allocate(sol(np, 3))
-    sol(:, 1:2) = x
-    sol(:, 3) = P
-    call writeMat(sol, "../sorties/P.dat")
-
-
-    ! approximation du gradient de pression avec l'opérateur GR_p
-    allocate(grad_P(np, 2), plot_vec(np, 4))
-    do i = 1, np
-        call GR_p(i, x, w, R, P, grad_P(i, :))
-        ! formattage pour gnuplot
-        plot_vec(i, :) = (/ x(i, :), (grad_P(i, :) / fnorme2(grad_P(i, :))) * 0.5_rp * dx /)
-    end do
-    call writeMat(plot_vec, "../sorties/grad_P.dat")
-
-
-    ! -------------------------------------------------------------------------------------------------------
+    ! ---------------------------------------------------------------------------------------------------
     ! tension de surface Akinci / correction dimensionnelle (solver SPH)
-    ! -------------------------------------------------------------------------------------------------------
-    allocate(nor(np, 2))
-    allocate(fts(np, 2))
+    ! ---------------------------------------------------------------------------------------------------
     call normale(R, x, w, nor)
     do i = 1, np
         call F_TS(gamma_eau_air, i, x, w, nor, R, fts(i, :))
@@ -233,14 +319,12 @@ PROGRAM main
     call writeMat(nvec, "../sorties/n_fts.dat")
 
     ! doit valoir zéro car cas à l'équilibre
-    allocate(d_rwu_dt(np, 2))
     d_rwu_dt(:, 1) = w * grad_P(:, 1)
     d_rwu_dt(:, 2) = w * grad_P(:, 2)
     d_rwu_dt = d_rwu_dt + fts
 
     ! doit approcher (0, 0)
-    print *, "!!!"
-    print *, sum(d_rwu_dt(:, 1)), sum(d_rwu_dt(:, 2))
+    print *, "sum_i [ w_i GR_p(P)_i + (F_TS)_i ] =", sum(d_rwu_dt(:, 1)), sum(d_rwu_dt(:, 2))
 
     ! champ de vecteur
     do i = 1, np
@@ -249,27 +333,33 @@ PROGRAM main
     call writeMat(plot_vec, "../sorties/zero.dat")
 
 
-    ! -------------------------------------------------------------------------------------------------------
+    ! ---------------------------------------------------------------------------------------------------
     ! tension de surface précédente avec seulement le terme de cohésion
-    ! -------------------------------------------------------------------------------------------------------
-    do i = 1, np
-        call F_TS_cohesion(gamma_eau_air, i, x, w, R, fts(i, :))
-        nvec(i, :) = (/ x(i, :), (fts(i, :) / fnorme2(fts(i, :))) * 0.5_rp * dx /)
-        !nvec(i, :) = (/ x(i, :), (nor(i, :) / fnorme2(nor(i, :))) * 0.5_rp * dx /)
-    end do
-    d_rwu_dt(:, 1) = w * grad_P(:, 1)
-    d_rwu_dt(:, 2) = w * grad_P(:, 2)
-    d_rwu_dt = d_rwu_dt + fts
-    do i = 1, np
-        plot_vec(i, :) = (/ x(i, :), d_rwu_dt(i, :) /)
-    end do
-    call writeMat(plot_vec, "../sorties/zero.dat")
+    ! ---------------------------------------------------------------------------------------------------
+    !do i = 1, np
+    !    call F_TS_cohesion(gamma_eau_air, i, x, w, R, fts(i, :))
+    !    nvec(i, :) = (/ x(i, :), (fts(i, :) / fnorme2(fts(i, :))) * 0.5_rp * dx /)
+    !    !nvec(i, :) = (/ x(i, :), (nor(i, :) / fnorme2(nor(i, :))) * 0.5_rp * dx /)
+    !end do
+    !d_rwu_dt(:, 1) = w * grad_P(:, 1)
+    !d_rwu_dt(:, 2) = w * grad_P(:, 2)
+    !d_rwu_dt = d_rwu_dt + fts
+    !do i = 1, np
+    !    plot_vec(i, :) = (/ x(i, :), d_rwu_dt(i, :) /)
+    !end do
+    !call writeMat(plot_vec, "../sorties/zero.dat")
+
+
 
 
 
     ! *******************************************************************************************************
-    deallocate(x1, x2)
-    deallocate(x, w)
+    if (allocated(x1)) then
+        deallocate(x1)
+        deallocate(x2)
+    end if
+    deallocate(x)
+    deallocate(w)
     deallocate(grad_P)
     deallocate(fts)
     deallocate(nor)
