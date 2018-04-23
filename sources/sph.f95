@@ -469,4 +469,122 @@ contains
         end do
     end subroutine
 
+
+
+    ! -------------------------------------------------------------------------------------------------------
+    ! noyau Kordilla
+    ! -------------------------------------------------------------------------------------------------------
+    function C_Kordilla(x, R) result(W)
+        ! paramètres
+        real(rp), dimension(2), intent(in) :: x
+        real(rp), intent(in) :: R
+
+        ! return
+        real(rp) :: W
+
+        ! variables locales
+        real(rp) :: length
+
+        length = fnorme2(x)
+
+        if ((0.0_rp <= length) .and. (length < R / 3.0_rp)) then
+            W = (3.0_rp - 3.0_rp * length / R)**5 - 6.0_rp * (2.0_rp - 3.0_rp * length / R)**5 &
+                + 15.0_rp * (1.0_rp - 3.0_rp * length / R)**5
+            W = W * (81.0_rp / (359.0_rp * pi * R**3.0_rp))
+        else if ((R / 3.0_rp < length) .and. (length < 2.0_rp * R / 3.0_rp)) then
+            W = (3.0_rp - 3.0_rp * length / R)**5 - 6.0_rp * (2.0_rp - 3.0_rp * length / R)**5
+            W = W * (81.0_rp / (359.0_rp * pi * R**3.0_rp))
+        else if ((2.0_rp * R / 3.0_rp <= length) .and. (length < R)) then
+            W = (3.0_rp - 3.0_rp * length / R)**5
+            W = W * (81.0_rp / (359.0_rp * pi * R**3.0_rp))
+        else
+            W = 0.0_rp
+        end if
+    end function
+
+
+
+    ! -------------------------------------------------------------------------------------------------------
+    ! Force d'une particule sur une autre (Kordilla)
+    ! -------------------------------------------------------------------------------------------------------
+    ! y : coeff de tension de surface (gamma)
+    subroutine F_pp_kordilla(y, R_SPH, i, j, x, F)
+        ! paramètres
+        real(rp), intent(in) :: y, R_SPH
+        integer, intent(in) :: i, j
+        real(rp), dimension(:, :), intent(in) :: x
+        real(rp), dimension(2), intent(out) :: F
+
+        ! variables locales
+        real(rp) :: s_ff, A, B, h1, h2
+        real(rp), dimension(2) :: r
+        real(rp) :: length
+
+        A = 2.0_rp
+        B = -1.0_rp
+        h1 = 0.8_rp
+        h2 = 1.0_rp
+
+        r = x(i, :) - x(j, :)
+        length = fnorme2(r)
+
+        if (length <= R_SPH) then
+            F = y * (A * C_Kordilla(x(i, :), h1) * r / length + B * C_Kordilla(x(i, :), h2) * r / length)
+        else
+            F = 0.0_rp
+        end if
+    end subroutine
+
+
+
+    ! -------------------------------------------------------------------------------------------------------
+    ! force de tension de surface Kordilla
+    ! -------------------------------------------------------------------------------------------------------
+    subroutine F_TS_kordilla()
+        ! paramètres
+        !++!
+
+        ! variables locales
+        !++!
+    end subroutine
+
+
+
+    ! -------------------------------------------------------------------------------------------------------
+    ! Force de tension de surface idem akinci mais avec juste F_cohesion
+    ! -------------------------------------------------------------------------------------------------------
+    ! y : coefficient de tension de surface (gamma)
+    ! i : numéro d'une particule
+    ! x : particules (coordonnées)
+    ! w : volume des particules
+    ! R_SPH : rayon SPH
+    subroutine F_TS_cohesion(y, i, x, w, R_SPH, F)
+        ! paramètres
+        real(rp), intent(in) :: y
+        integer, intent(in) :: i
+        real(rp), dimension(:, :), intent(in) :: x
+        real(rp), dimension(:), intent(in) :: w
+        real(rp), intent(in) :: R_SPH
+        real(rp), dimension(2), intent(out) :: F
+
+        ! variables locales
+        integer :: k, np, j
+
+        np = size(w)
+
+        F = 0.0_rp
+        do j = 1, i - 1
+            if (fnorme2(x(i, :) - x(j, :)) <= R_SPH) then
+                F = F + y * w(i) * R_SPH * C_Akinci(fnorme2(x(i, :) - x(j, :)), R_SPH) &
+                    * (x(i, :) - x(j, :)) / fnorme2(x(i, :) - x(j, :))
+            end if
+        end do
+        do j = i + 1, np
+            if (fnorme2(x(i, :) - x(j, :)) <= R_SPH) then
+                F = F + y * w(i) * R_SPH * C_Akinci(fnorme2(x(i, :) - x(j, :)), R_SPH) &
+                    * (x(i, :) - x(j, :)) / fnorme2(x(i, :) - x(j, :))
+            end if
+        end do
+    end subroutine
+
 END MODULE sph

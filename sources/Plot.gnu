@@ -3,7 +3,7 @@
 reset
 # fichier de sortie
 set term postscript eps enhanced color solid size 3.5,2.62 font 'Helvetica,12'
-set output "../graphes/pave.eps"
+set output "../graphes/pave.ps"
 set encoding utf8
 
 # paramètres
@@ -25,7 +25,7 @@ plot "../sorties/x.dat" u 1:2 lc rgb "#008000" lw 3 title "particules",\
 # ===========================================================================================================
 reset
 set term postscript eps enhanced color solid size 3.5,2.62 font 'Helvetica,12'
-set output "../graphes/circle.eps"
+set output "../graphes/circle.ps"
 set encoding utf8
 
 # paramètres
@@ -46,8 +46,8 @@ plot "../sorties/x_circle.dat" u 1:2 lc rgb "#008000" lw 1 title "particules",\
 
 # ===========================================================================================================
 reset
-set term postscript eps enhanced color solid size 3.5,2.62 font 'Helvetica,12'
-set output "../graphes/pression.eps"
+set term postscript eps enhanced color solid size 7,5.24 font 'Helvetica,12'
+set output "../graphes/pression.ps"
 set encoding utf8
 
 # paramètres
@@ -66,10 +66,11 @@ set cblabel "pression"
 # tracé
 plot "../sorties/P.dat" u 1:2:3 with points pointtype 5 pointsize 1 palette title "particule",\
      "../sorties/cc.dat" u 1:2 w l lw 1 title "délimitation bulle",\
-     "../sorties/grad_P.dat" u 1:2:3:4 with vectors head filled lt rgb "red" title "gradient de pression",\
-     "../sorties/n_fts.dat" u 1:2:3:4 with vectors head filled lt rgb "green" title "Force tension surface"
+     "../sorties/zero.dat" u 1:2:3:4 with vectors head filled lt rgb "black" title "wi * GR_p(P) + F_TS"
+#     "../sorties/n_fts.dat" u 1:2:3:4 with vectors head filled lt rgb "green" title "Force tension surface"
 
 
+#    "../sorties/grad_P.dat" u 1:2:3:4 with vectors head filled lt rgb "red" title "gradient de pression",\
 
 # ===========================================================================================================
 # affichage écran

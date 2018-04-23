@@ -12,6 +12,8 @@ PROGRAM main
 
     implicit none
 
+    integer, parameter :: choice = 1
+
     ! PARTIE 1 : MAILLAGE D'UN PAVÉ 2D
     ! variables pour "maillage" initial
     integer :: n
@@ -151,8 +153,12 @@ PROGRAM main
 
 
 
+    ! =======================================================================================================
+    ! À partir d'une bulle
+    ! =======================================================================================================
+
     ! -------------------------------------------------------------------------------------------------------
-    ! maillage d'une bulle
+    ! maillage de la bulle
     ! -------------------------------------------------------------------------------------------------------
     deallocate(x)
 
@@ -191,6 +197,9 @@ PROGRAM main
     call writeMat(cc, "../sorties/cc.dat")
 
 
+    ! -------------------------------------------------------------------------------------------------------
+    ! initialisation inconnues équation
+    ! -------------------------------------------------------------------------------------------------------
     ! initialisation de la pression
     allocate(P(np))
     call init_pression(x, centre, rayon, P)
@@ -201,16 +210,18 @@ PROGRAM main
 
 
     ! approximation du gradient de pression avec l'opérateur GR_p
-    allocate(grad_P(np, 4))
+    allocate(grad_P(np, 2), plot_vec(np, 4))
     do i = 1, np
-        call GR_p(i, x, w, R, P, real2)
+        call GR_p(i, x, w, R, P, grad_P(i, :))
         ! formattage pour gnuplot
-        grad_P(i, :) = (/ x(i, :), (real2 / fnorme2(real2)) * 0.5_rp * dx /)
+        plot_vec(i, :) = (/ x(i, :), (grad_P(i, :) / fnorme2(grad_P(i, :))) * 0.5_rp * dx /)
     end do
-    call writeMat(grad_P, "../sorties/grad_P.dat")
+    call writeMat(plot_vec, "../sorties/grad_P.dat")
 
 
-    ! tension de surface
+    ! -------------------------------------------------------------------------------------------------------
+    ! tension de surface Akinci / correction dimensionnelle (solver SPH)
+    ! -------------------------------------------------------------------------------------------------------
     allocate(nor(np, 2))
     allocate(fts(np, 2))
     call normale(R, x, w, nor)
@@ -220,16 +231,39 @@ PROGRAM main
         !nvec(i, :) = (/ x(i, :), (nor(i, :) / fnorme2(nor(i, :))) * 0.5_rp * dx /)
     end do
     call writeMat(nvec, "../sorties/n_fts.dat")
-    print *, "x"
-    print *, fts(:, 1) - grad_P(:, 3)
-    print *, "y"
-    print *, fts(:, 2) - grad_P(:, 4)
 
+    ! doit valoir zéro car cas à l'équilibre
     allocate(d_rwu_dt(np, 2))
-    d_rwu_dt(:, 1) = w * grad_P(:, 3)
-    d_rwu_dt(:, 2) = w * grad_P(:, 4)
-
+    d_rwu_dt(:, 1) = w * grad_P(:, 1)
+    d_rwu_dt(:, 2) = w * grad_P(:, 2)
     d_rwu_dt = d_rwu_dt + fts
+
+    ! doit approcher (0, 0)
+    print *, "!!!"
+    print *, sum(d_rwu_dt(:, 1)), sum(d_rwu_dt(:, 2))
+
+    ! champ de vecteur
+    do i = 1, np
+        plot_vec(i, :) = (/ x(i, :), d_rwu_dt(i, :) /)
+    end do
+    call writeMat(plot_vec, "../sorties/zero.dat")
+
+
+    ! -------------------------------------------------------------------------------------------------------
+    ! tension de surface précédente avec seulement le terme de cohésion
+    ! -------------------------------------------------------------------------------------------------------
+    do i = 1, np
+        call F_TS_cohesion(gamma_eau_air, i, x, w, R, fts(i, :))
+        nvec(i, :) = (/ x(i, :), (fts(i, :) / fnorme2(fts(i, :))) * 0.5_rp * dx /)
+        !nvec(i, :) = (/ x(i, :), (nor(i, :) / fnorme2(nor(i, :))) * 0.5_rp * dx /)
+    end do
+    d_rwu_dt(:, 1) = w * grad_P(:, 1)
+    d_rwu_dt(:, 2) = w * grad_P(:, 2)
+    d_rwu_dt = d_rwu_dt + fts
+    do i = 1, np
+        plot_vec(i, :) = (/ x(i, :), d_rwu_dt(i, :) /)
+    end do
+    call writeMat(plot_vec, "../sorties/zero.dat")
 
 
 
