@@ -355,34 +355,48 @@ contains
     ! -------------------------------------------------------------------------------------------------------
     ! Noyau cohésion pour tension de surface (cf C(r) Akinci p. 3)
     ! -------------------------------------------------------------------------------------------------------
-    function C_Akinci(r, R_SPH) result(kernel_TS)
+    function C_Akinci(r, R_SPH) result(C)
         ! paramètres
         real(rp), intent(in) :: r, R_SPH
 
         ! return
+        real(rp) :: C
+
+        ! variables locales
         real(rp) :: kernel_TS, q
         real(RP), save :: TSkernorm = 139.0_rp / 1120.0_rp * 336.0_rp / 37.0_rp
-        integer :: D
+        ! en dimension 2, sinon vaut 1 en dimension 3
+        real(RP), save :: C_norm = 417.0_rp / 370.0_rp
+        integer :: d
 
         ! dimension
-        D = 2
-        q = r/R_SPH
+        !D = 2
+        !q = r/R_SPH
 
-        kernel_TS = 0._rp
-        if ((2._rp*q>1._rp).and.(q<=1._RP)) then
-            kernel_TS = (1._rp-q)**3._rp*q**3._rp
-        elseif ((q>0._rp).and.(2._rp*q<=1._rp)) then
-            kernel_TS = 2._rp*(1._rp-q)**3._rp*q**3._rp - 1._rp/64._rp
-        endif
-        kernel_TS = TSkernorm*32._RP/(PI*R_SPH**real(D, rp))*kernel_TS
+        !kernel_TS = 0._rp
+        !if ((2._rp*q>1._rp).and.(q<=1._RP)) then
+        !    kernel_TS = (1._rp-q)**3._rp*q**3._rp
+        !elseif ((q>0._rp).and.(2._rp*q<=1._rp)) then
+        !    kernel_TS = 2._rp*(1._rp-q)**3._rp*q**3._rp - 1._rp/64._rp
+        !endif
+        !kernel_TS = TSkernorm*32._RP/(PI*R_SPH**real(D, rp))*kernel_TS
 
         !if ((0.0_rp < r) .and. (r <= R_SPH / 2.0_rp)) then
-        !    C = (32.0_rp / (pi * R_SPH**9)) * 2.0_rp * (R_SPH - r)**3 * r**3 - R_SPH**6 / 64.0_rp
+        !    C = (32.0_rp / (pi * R_SPH**9)) * (2.0_rp * (R_SPH - r)**3 * r**3 - R_SPH**6 / 64.0_rp)
         !else if ((R_SPH / 2.0_rp < r) .and. (r <= R_SPH)) then
         !    C = (32.0_rp / (pi * R_SPH**9)) * (R_SPH - r)**3 * r**3
         !else
         !    C = 0.0_rp
         !end if
+
+        d = 2
+        if ((0.0_rp < r) .and. (r <= R_SPH / 2.0_rp)) then
+            C = C_norm * (32.0_rp / (pi * R_SPH**d * R_SPH**6)) * (2.0_rp * (R_SPH - r)**3 * r**3 - R_SPH**6 / 64.0_rp)
+        else if ((R_SPH / 2.0_rp < r) .and. (r <= R_SPH)) then
+            C = C_norm * (32.0_rp / (pi * R_SPH**d * R_SPH**6)) * (R_SPH - r)**3 * r**3
+        else
+            C = 0.0_rp
+        end if
     end function
 
 

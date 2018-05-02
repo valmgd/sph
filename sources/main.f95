@@ -116,6 +116,12 @@ PROGRAM main
         ! rayon noyau SPH
         R = 4.0_rp * dx
 
+        xx = linspace(0.00001_rp, R, 100)
+        do i = 1, 100
+            cc(i, :) = (/ xx(i), C_Akinci(xx(i), R) /)
+        end do
+        call writeMat(cc, "../sorties/CAkinci.dat")
+
 
 
 
@@ -134,7 +140,11 @@ PROGRAM main
                 ! gradient régularisé
                 call GR(i, x, w, R, (/ (1.0_rp, k=1, np) /), real2)
                 ! formattage pour gnuplot
-                nvec(i, :) = (/ x(i, :), (real2 / fnorme2(real2)) * 0.5_rp * dx /)
+                if (fnorme2(real2) > 10.0_rp**(-10)) then
+                    nvec(i, :) = (/ x(i, :), (real2 / fnorme2(real2)) * 0.5_rp * dx /)
+                else
+                    nvec(i, :) = (/ 0.0_rp, 0.0_rp /)
+                end if
 
                 call GR_m(i, x, w, R, (/ (1.0_rp, k=1, np) /), real2_2)
                 call GR_p(i, x, w, R, (/ (1.0_rp, k=1, np) /), real2_3)
@@ -181,21 +191,14 @@ PROGRAM main
             end do
         end if
 
-        ! contour de la bulle que nous avons maillé pour graphique
-        xx = linspace(0.0_rp, 4.0_rp, 100)
-        cc(1:25, 1) = xx(1:25) * (xmax - xmin) + xmin
-        cc(1:25, 2) = ymin - 0.5_rp * dy
-
-        cc(26:50, 1) = xmax + 0.5_rp * dx
-        cc(26:50, 2) = xx(1:25) * (ymax - ymin) + ymin
-
-        cc(51:75, 1) = xx(25:1:-1) * (xmax - xmin) + xmin
-        cc(51:75, 2) = ymax + 0.5_rp * dy
-
-        cc(76:100, 1) = xmin - 0.5_rp * dx
-        cc(76:100, 2) = xx(25:1:-1) * (ymax - ymin) + ymin
-
-        call writeMat(cc, "../sorties/cc.dat")
+        ! contour du domaine que nous avons maillé pour graphique
+        open(unit = 10, file = "../sorties/cc.dat")
+        write (10, *) xmin - 0.5_rp * dx, ymin - 0.5_rp * dy
+        write (10, *) xmax + 0.5_rp * dx, ymin - 0.5_rp * dy
+        write (10, *) xmax + 0.5_rp * dx, ymax + 0.5_rp * dy
+        write (10, *) xmin - 0.5_rp * dx, ymax + 0.5_rp * dy
+        write (10, *) xmin - 0.5_rp * dx, ymin - 0.5_rp * dy
+        close(10)
 
 
         ! ---------------------------------------------------------------------------------------------------
@@ -228,8 +231,8 @@ PROGRAM main
         ! maillage de la bulle
         ! ---------------------------------------------------------------------------------------------------
         ! données du disque à mailler
-        centre = (/ 1.0_rp, 1.0_rp /)
-        rayon = 1.0_rp
+        centre = (/ 0.0_rp, 0.0_rp /)
+        rayon = 0.001_rp
 
 
         ! maillage du disque et actualisation des paramètre dépendant du maillage
